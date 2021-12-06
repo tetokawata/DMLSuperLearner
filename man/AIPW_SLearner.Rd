@@ -14,7 +14,8 @@ AIPW_SLearner(
   core = 1,
   process = TRUE,
   weights = NULL,
-  D.family = binomial()
+  D.family = binomial(),
+  p.score = NULL
 )
 }
 \arguments{
@@ -33,6 +34,8 @@ AIPW_SLearner(
 \item{weights}{Sample weights}
 
 \item{D.family}{gaussian() or binomial() to describe the error distribution.}
+
+\item{p.score}{propensity score vector}
 }
 \value{
 A list containing follows:

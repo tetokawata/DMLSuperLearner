@@ -63,8 +63,6 @@ Robinson_SLearner <- function(X,
                                       cvControl = SuperLearner.CV.control(V = SL.V))
     Y.hat = temp$library.predict[,1]
     if (is_empty(temp$SL.predict) == FALSE) {Y.hat = temp$SL.predict}
-    Y.all <- temp$library.predict |> as.data.frame()
-    colnames(Y.all) <- stringr::str_c("Y",SL.DML.library,sep = ".")
     temp = SuperLearner(X = X[DML.group != g,],
                                       Y = D[DML.group != g],
                                       newX = X[DML.group == g,],
@@ -72,15 +70,11 @@ Robinson_SLearner <- function(X,
                                       cvControl = SuperLearner.CV.control(V = SL.V))
     D.hat = temp$library.predict[,1]
     if (is_empty(temp$SL.predict) == FALSE) {D.hat = temp$SL.predict}
-    D.all <- temp$library.predict|> as.data.frame()
-    colnames(D.all) <- stringr::str_c("D",SL.DML.library,sep = ".")
     tibble::tibble(Y = Y[DML.group == g],
                    D = D[DML.group == g],
                    Y.hat = Y.hat,
                    D.hat = D.hat,
                    X[DML.group == g,],
-                   D.all,
-                   Y.all,
                    weights = weights[DML.group == g])
   }
   # Iteration

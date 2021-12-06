@@ -10,6 +10,7 @@
 #' @param SL.V Number of folds in each SuperLearner
 #' @param weights Sample weights
 #' @param D.family gaussian() or binomial() to describe the error distribution.
+#' @param p.score propensity score vector
 #'
 #' @return A list containing follows:
 #' \item{data}{ Data frame including estimated nuisance}
@@ -45,7 +46,8 @@ AIPW_SLearner <- function(X,
                           core  = 1,
                           process = TRUE,
                           weights = NULL,
-                          D.family = binomial()){
+                          D.family = binomial(),
+                          p.score = NULL){
   require(magrittr)
   require(furrr)
   require(SuperLearner)
@@ -66,8 +68,6 @@ AIPW_SLearner <- function(X,
                                       )
     Y1.hat = temp$library.predict[,1]
     if (is_empty(temp$SL.predict) == FALSE) {Y1.hat = temp$SL.predict}
-    Y1.all <- temp$library.predict |> as.data.frame()
-    colnames(Y1.all) <- stringr::str_c("Y1",SL.DML.library,sep = ".")
     # Y0
     temp = SuperLearner(X = X[DML.group != g & D == 0,],
                                       Y = Y[DML.group != g & D == 0],
@@ -77,29 +77,23 @@ AIPW_SLearner <- function(X,
                                       )
     Y0.hat = temp$library.predict[,1]
     if (is_empty(temp$SL.predict) == FALSE) {Y0.hat = temp$SL.predict}
-    Y0.all <- temp$library.predict |> as.data.frame()
-    colnames(Y0.all) <- stringr::str_c("Y0",SL.DML.library,sep = ".")
     # D
-    temp = SuperLearner(X = X[DML.group != g,],
-                                      Y = D[DML.group != g],
-                                      newX = X[DML.group == g,],
-                                      SL.library = SL.DML.library,
-                                      cvControl = SuperLearner.CV.control(V = SL.V),
-                                      family = D.family
-    )
+    D.hat = p.score[DML.group == g]
+    if (is.null(p.score)) {temp = SuperLearner(X = X[DML.group != g,],
+                                               Y = D[DML.group != g],
+                                               newX = X[DML.group == g,],
+                                               SL.library = SL.DML.library,
+                                               cvControl = SuperLearner.CV.control(V = SL.V),
+                                               family = D.family
+                                               )
     D.hat = temp$library.predict[,1]
-    if (is_empty(temp$SL.predict) == FALSE) {D.hat = temp$SL.predict}
-    D.all <- temp$library.predict |> as.data.frame()
-    colnames(D.all) <- stringr::str_c("D",SL.DML.library,sep = ".")
+    if (is_empty(temp$SL.predict) == FALSE) {D.hat = temp$SL.predict}}
     tibble::tibble(Y = Y[DML.group == g],
                    D = D[DML.group == g],
-                   Y1.hat = Y1.hat[,1],
-                   Y0.hat = Y0.hat[,1],
-                   D.hat = D.hat[,1],
+                   Y1.hat = Y1.hat,
+                   Y0.hat = Y0.hat,
+                   D.hat = D.hat,
                    X[DML.group == g,],
-                   D.all,
-                   Y1.all,
-                   Y0.all,
                    weights = weights[DML.group == g])
   }
   # Iteration
