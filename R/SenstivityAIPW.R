@@ -35,7 +35,7 @@
 #'
 
 
-EstPartialLinear <- function(Y, M, G, Alpha, RY2, RD2) {
+SenstivityAIPW <- function(Y, M, G, Alpha, RY2, RD2) {
   result <- list()
   TempN <- length(Y)
   TempRY2 <- RY2
