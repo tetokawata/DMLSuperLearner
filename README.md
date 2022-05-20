@@ -7,3 +7,5 @@
   - Robinson estimation on the partial linear model
   
   - Augmented inverse propensity weighted estimator
+  
+  - Sensitivity analysis on AIPW estimator
