@@ -19,13 +19,32 @@
 #' @examples
 #'
 #' # Example data
-#' X <- matrix(rnorm(200,0,1),100)
-#' D <- 2*X[,1] + runif(100,-10,10)
-#' Y <- 3*X[,1] + rnorm(100,0,1)
+#' N <- 1000
+#' X <- runif(N,0,1)
+#' D <- sample(0:1,N,replace = TRUE)
+#' Y <- D + X + rnorm(N,0,1)
 #'
-#' # Estimation
-#' fit <- Robinson_SLearner(X = X, D = D, Y = Y)
-#' fit$parameter_estimation
+#' Fit <- AIPW$new(Y = Y,
+#' A = D,
+#' W = X,
+#' Q.SL.library = c("SL.lm"),
+#' g.SL.library = c("SL.lm")
+#' )
+#' Fit$fir()$Fit$summary()
+#'
+#' EstG <- Fit$obs_est$mu
+#' EstM <- Fit$obs_est$mu1 - Fit$obs_est$mu0
+#' HatD <- Fit$obs_est$p_score
+#' EstAlpha <- D/HatD - (1-D)/(1-HatD)
+#' FitTest <- EstPartialLinear(Y = Y, M = EstM, G = EstG, Alpha = EstAlpha, RY2 = 0.05, RD2 = 0.95)
+#' tibble(PointATE = FitTest$Main$Theta,
+#' PointUpper95th = FitTest$Main$Theta + 1.96*FitTest$Main$ThetaSD,
+#' PointLower95th = FitTest$Main$Theta - 1.96*FitTest$Main$ThetaSD,
+#' BoundUpper = FitTest$Main$Upper,
+#' BoundLower = FitTest$Main$Lower,
+#' BoundUpper95th = FitTest$Main$Upper + 1.96*FitTest$Main$UpperSD,
+#' BoundLower95th = FitTest$Main$Lower - 1.96*FitTest$Main$LowerSD)
+#'
 #'
 #' @references
 #'
