@@ -1,18 +1,18 @@
 #' @title Sensitivity Analysis for AIPW estimators
 #'
 #' @description \code{SenstivityAIPW} is used to implement Robinson estimation with Super Learner
-#'
+#' Y, M, G, Alpha, RY2, RD2
 #' @param Y Outcome vector
-#' @param D Treatment vector
-#' @param X Control as data frame
-#' @param SL.DML.library SL.library to estimate nuisance functions. Use first method if all SL coefficient are zero.
-#' @param DML.V Number of folds
-#' @param SL.V Number of folds in each SuperLearner
-#' @param weights Sample weights
+#' @param M Plugin score vector
+#' @param G Outcome predictors
+#' @param Alpha Reiz representer
+#' @param RY2 R2 between prediction error of Y and unobservables
+#' @param RD2 R2 between estimated and ideal Reiz representer
 #'
 #' @return A list containing follows:
-#' \item{data}{ Data frame including estimated nuisance}
-#' \item{parameter_estimation}{ Estimation result}
+#' \item{Nuisance}{ estimated nuisance}
+#' \item{Score}{ Score}
+#' \item{Main}{ Estimation results}
 #'
 #' @export
 #'
@@ -28,73 +28,54 @@
 #' fit$parameter_estimation
 #'
 #' @references
-#' Robinson, P. M. (1988). Root-N-consistent semiparametric regression. Econometrica, 931-954.
 #'
-#' Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C., Newey, W., & Robins, J. (2018). Double/debiased machine learning for treatment and structural parameters.
+#' Cinelli, C., & Hazlett, C. (2020). Making sense of sensitivity: Extending omitted variable bias. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 82(1), 39-67.
 #'
-#' van der Laan, M. J., Polley, E. C. and Hubbard, A. E. (2007) Super Learner. Statistical Applications of Genetics and Molecular Biology, 6, article 25.
+#' Chernozhukov, V., Cinelli, C., Newey, W., Sharma, A., & Syrgkanis, V. (2021). Omitted Variable Bias in Machine Learned Causal Models. arXiv preprint arXiv:2112.13398.
 #'
 
 
-SenstivityAIPW <- function(X,
-                              D,
-                              Y,
-                              SL.DML.library = c("SL.ranger","SL.mean"),
-                              DML.V = 2,
-                              SL.V = 2,
-                              core  = 1,
-                              process = TRUE,
-                              weights = NULL){
-  require(magrittr)
-  require(furrr)
-  require(SuperLearner)
-  # Weight
-  if(is.null(weights)) {
-    weights <- rep(1, length(Y))
-  }
-  # Data split
-  DML.group <- sample(1:DML.V, length(Y), replace = TRUE)
-  # Estimate nuisance
-  eachDML <- function(g){
-    temp = SuperLearner(X = X[DML.group != g,],
-                        Y = Y[DML.group != g],
-                        newX = X[DML.group == g,],
-                        SL.library = SL.DML.library,
-                        cvControl = SuperLearner.CV.control(V = SL.V))
-    Y.hat = temp$library.predict[,1]
-    if (is_empty(temp$SL.predict) == FALSE) {Y.hat = temp$SL.predict}
-    temp = SuperLearner(X = X[DML.group != g,],
-                        Y = D[DML.group != g],
-                        newX = X[DML.group == g,],
-                        SL.library = SL.DML.library,
-                        cvControl = SuperLearner.CV.control(V = SL.V))
-    D.hat = temp$library.predict[,1]
-    if (is_empty(temp$SL.predict) == FALSE) {D.hat = temp$SL.predict}
-    tibble::tibble(Y = Y[DML.group == g],
-                   D = D[DML.group == g],
-                   Y.hat = Y.hat,
-                   D.hat = D.hat,
-                   X[DML.group == g,],
-                   weights = weights[DML.group == g])
-  }
-  # Iteration
-  plan(multisession, workers = core)
-  result <- list(data = future_map_dfr(1:DML.V,
-                                       eachDML,
-                                       .options = furrr_options(seed = 1L),
-                                       .progress = process)
-  )
-  # Estimate R-learner
-  result$parameter_estimation <-
-    result$data |>
-    dplyr::mutate(Y.oht = Y - Y.hat,
-                  D.oht = D - D.hat) %>%
-    estimatr::lm_robust(Y.oht ~ 0 + D.oht,
-                        data = .,
-                        weights = weights) |>
-    generics::tidy() |>
-    dplyr::mutate(outcome = "Y",
-                  term = "Rlearner")
-  result
+EstPartialLinear <- function(Y, M, G, Alpha, RY2, RD2) {
+  result <- list()
+  TempN <- length(Y)
+  TempRY2 <- RY2
+  TempRD2 <- RD2
+
+  CY2 <- TempRY2
+  CD2 <- (1 - TempRD2) / TempRD2
+
+  TempY <- Y
+  TempX <- X
+  TempD <- D
+  TempM <- M
+  TempAlpha <- Alpha
+  TempG <- G
+
+  result$Main$Theta <- mean(TempM + (TempY - TempG) * TempAlpha)
+  result$Nuisance$Sigma2 <- mean((TempY - TempG)^2)
+  result$Nuisance$V2 <- mean(TempAlpha^2)
+  result$Nuisance$S2 <- result$Nuisance$Sigma2 * result$Nuisance$V2
+  result$Nuisance$CY2 <- TempRY2
+  result$Nuisance$CD2 <- (1 - TempRD2) / TempRD2
+
+  result$Main$Lower <- result$Main$Theta -
+    sqrt(result$Nuisance$S2) * sqrt(result$Nuisance$CY2) * sqrt(result$Nuisance$CD2)
+  result$Main$Upper <- result$Main$Theta +
+    sqrt(result$Nuisance$S2) * sqrt(result$Nuisance$CY2) * sqrt(result$Nuisance$CD2)
+
+  result$Score$Theta <- result$Main$Theta - TempM - (TempY - TempG) * TempAlpha
+  result$Score$Sigma2 <- result$Nuisance$Sigma2 - (TempY - TempG)^2
+  result$Score$V2 <- result$Nuisance$V2 - TempAlpha^2
+  result$Score$Lower <- result$Score$Theta -
+    0.5*
+    ((sqrt(result$Nuisance$CY2)*sqrt(result$Nuisance$CD2))/sqrt(result$Nuisance$S2))*
+    (result$Nuisance$Sigma2*result$Score$V2 + result$Nuisance$V2*result$Score$Sigma2)
+  result$Score$Upper <- result$Score$Theta +
+    0.5*
+    ((sqrt(result$Nuisance$CY2)*sqrt(result$Nuisance$CD2))/sqrt(result$Nuisance$S2))*
+    (result$Nuisance$Sigma2*result$Score$V2 + result$Nuisance$V2*result$Score$Sigma2)
+  result$Main$ThetaSD <- sd(result$Score$Theta)/sqrt(TempN)
+  result$Main$UpperSD <- sd(result$Score$Upper)/sqrt(TempN)
+  result$Main$LowerSD <- sd(result$Score$Lower)/sqrt(TempN)
+  return(result)
 }
-
