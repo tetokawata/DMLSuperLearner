@@ -64,8 +64,6 @@ SenstivityAIPW <- function(Y, M, G, Alpha, RY2, RD2) {
   CD2 <- (1 - TempRD2) / TempRD2
 
   TempY <- Y
-  TempX <- X
-  TempD <- D
   TempM <- M
   TempAlpha <- Alpha
   TempG <- G
