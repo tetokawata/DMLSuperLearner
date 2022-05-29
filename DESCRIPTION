@@ -1,7 +1,7 @@
 Package: DMLSuperLearner
 Type: Package
 Title: Double-Debiased Machine Learning with Super Learner
-Version: 0.1.0
+Version: 0.1.1
 Author: Keisuke Kawata
 Maintainer: Keisuke Kawata <keisukekawata@iss.u-tokyo.ac.jp>
 Description: Implement double-debiased machine learning in which Super Learner estimates nuisance functions.
